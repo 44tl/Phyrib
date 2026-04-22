@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-# Phyrib - Modern Physics for Raylib
-=======
 # Phyrib - Modern Physics for Raylib fr
->>>>>>> 00766070c73ea702b4d61ae5ca4d5503b1fe1cb9
 
 A fast, easy-to-use 2D physics library built specifically for [raylib](https://www.raylib.com/). Phyrib provides rigid body dynamics, collision detection, and constraint solving with a clean C API.
 
@@ -338,11 +334,7 @@ internal.h        - Private helpers, math, flags
 - No specialized circle-polygon optimizations yet (but SAT handles them fine)
 - Constraint solver is sequential impulse (not Baumgarte stabilized for all types yet)
 
-<<<<<<< HEAD
-## Future Work
-=======
 ## Future Work I'll be doing
->>>>>>> 00766070c73ea702b4d61ae5ca4d5503b1fe1cb9
 
 - Continuous Collision Detection (CCD) for fast objects
 - Concave trimesh support (via decomposition into convex hulls)
@@ -358,16 +350,8 @@ Phyrib is released under the MIT License. See LICENSE file for details.
 
 ## Contributing
 
-<<<<<<< HEAD
-Contributions welcome! Please open issues or PRs on GitHub.
-
----
-
-Built for game developers who want real physics without the complexity of Box2D. Happy coding!
-=======
 Closed just fork and dev ur self if I'm not updating this.
 
 ---
 
 Built for game developers who want real physics without the complexity of Box2D.
->>>>>>> 00766070c73ea702b4d61ae5ca4d5503b1fe1cb9
