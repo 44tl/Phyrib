@@ -10,54 +10,41 @@ struct RigidBody {
     BodyType type;
     uint8_t flags;
 
-    // Transform
     Vector2 position;
     float angle;
 
-    // Velocity
     Vector2 linearVelocity;
     float angularVelocity;
 
-    // Forces (accumulated during step)
     Vector2 force;
     float torque;
 
-    // Mass data
     float mass;
     float invMass;
     float inertia;
     float invInertia;
 
-    // Damping
     float linearDamping;
     float angularDamping;
 
-    // Material & filtering
     PhysicsMaterial material;
     CollisionFilter filter;
 
-    // Shape
     Shape* shape;
 
-    // Sleep state
     float sleepTime;
     int32_t islandIndex;
 
-    // User data
     void* userData;
 
-    // Linked list for world
     RigidBody* next;
     RigidBody* prev;
 
-    // Name storage (optional)
     char name[32];
 };
 
-// Global static ID counter
 static PhysicsBodyID gNextBodyID = 1;
 
-// Helper to compute mass and inertia from shape
 static void RigidBody_ComputeMassData(RigidBody* body) {
     if (body->type == PR_BODY_STATIC) {
         body->mass = 0.0f;
@@ -111,18 +98,14 @@ RigidBody* RigidBody_Create(const RigidBodyDef* def) {
     body->islandIndex = -1;
     body->flags = BODY_FLAG_AWAKE;
 
-    // Copy shape
     body->shape = (Shape*)PR_Alloc(sizeof(Shape));
     Shape_Clone(body->shape, def->shape);
 
-    // Compute mass properties
     RigidBody_ComputeMassData(body);
 
-    // Set initial force/torque
     body->force = (Vector2){0, 0};
     body->torque = 0.0f;
 
-    // Set name
     snprintf(body->name, sizeof(body->name), "Body_%u", body->id);
 
     return body;
@@ -134,7 +117,6 @@ void RigidBody_Destroy(RigidBody* body) {
     PR_Free(body);
 }
 
-// Getters/Setters
 const char* RigidBody_GetName(RigidBody* body) { return body ? body->name : NULL; }
 PhysicsBodyID RigidBody_GetID(RigidBody* body) { return body ? body->id : 0; }
 BodyType RigidBody_GetType(RigidBody* body) { return body ? body->type : PR_BODY_STATIC; }
@@ -150,7 +132,6 @@ void RigidBody_SetType(RigidBody* body, BodyType type) {
     }
 }
 
-// Transform
 Vector2 RigidBody_GetPosition(RigidBody* body) { return body ? body->position : (Vector2){0,0}; }
 void RigidBody_SetPosition(RigidBody* body, Vector2 pos) { if (body) body->position = pos; }
 float RigidBody_GetAngle(RigidBody* body) { return body ? body->angle : 0.0f; }
@@ -168,7 +149,6 @@ void RigidBody_SetTransform(RigidBody* body, Vector2 pos, float angle) {
     body->angle = angle;
 }
 
-// Velocity
 Vector2 RigidBody_GetLinearVelocity(RigidBody* body) { return body ? body->linearVelocity : (Vector2){0,0}; }
 void RigidBody_SetLinearVelocity(RigidBody* body, Vector2 vel) { if (body) body->linearVelocity = vel; }
 float RigidBody_GetAngularVelocity(RigidBody* body) { return body ? body->angularVelocity : 0.0f; }
@@ -214,7 +194,6 @@ void RigidBody_ClearForces(RigidBody* body) {
     }
 }
 
-// Mass
 float RigidBody_GetMass(RigidBody* body) { return body ? body->mass : 0.0f; }
 void RigidBody_SetMass(RigidBody* body, float mass) {
     if (!body || body->type == PR_BODY_STATIC) return;
@@ -237,25 +216,20 @@ float RigidBody_GetInvInertia(RigidBody* body) { return body ? body->invInertia 
 void RigidBody_SetFixedRotation(RigidBody* body, bool fixed) { if (body) { body->fixedRotation = fixed; RigidBody_ComputeMassData(body); } }
 bool RigidBody_IsFixedRotation(RigidBody* body) { return body ? body->fixedRotation : false; }
 
-// Damping
 float RigidBody_GetLinearDamping(RigidBody* body) { return body ? body->linearDamping : 0.0f; }
 void RigidBody_SetLinearDamping(RigidBody* body, float damping) { if (body) body->linearDamping = PR_Clamp(damping, 0.0f, 1.0f); }
 float RigidBody_GetAngularDamping(RigidBody* body) { return body ? body->angularDamping : 0.0f; }
 void RigidBody_SetAngularDamping(RigidBody* body, float damping) { if (body) body->angularDamping = PR_Clamp(damping, 0.0f, 1.0f); }
 
-// Material
 PhysicsMaterial RigidBody_GetMaterial(RigidBody* body) { return body ? body->material : PR_MATERIAL_DEFAULT; }
 void RigidBody_SetMaterial(RigidBody* body, PhysicsMaterial mat) { if (body) { body->material = mat; RigidBody_ComputeMassData(body); } }
 
-// Collision filter
 CollisionFilter RigidBody_GetCollisionFilter(RigidBody* body) { return body ? body->filter : (CollisionFilter){0xFFFF, 0xFFFF, 0}; }
 void RigidBody_SetCollisionFilter(RigidBody* body, CollisionFilter filter) { if (body) body->filter = filter; }
 
-// Sensor
 bool RigidBody_IsSensor(RigidBody* body) { return body ? body->type == PR_BODY_KINEMATIC && body->isSensor : false; }
 void RigidBody_SetSensor(RigidBody* body, bool sensor) { if (body) body->isSensor = sensor; }
 
-// Sleep
 bool RigidBody_IsAwake(RigidBody* body) { return body ? (body->flags & BODY_FLAG_SLEEPING) == 0 : false; }
 void RigidBody_SetAwake(RigidBody* body, bool awake) {
     if (!body) return;
@@ -269,7 +243,6 @@ void RigidBody_SetAwake(RigidBody* body, bool awake) {
 void RigidBody_Sleep(RigidBody* body) { if (body) body->flags |= BODY_FLAG_SLEEPING; }
 void RigidBody_WakeUp(RigidBody* body) { if (body) { body->flags &= ~BODY_FLAG_SLEEPING; body->sleepTime = 0.0f; } }
 
-// Shape
 Shape* RigidBody_GetShape(RigidBody* body) { return body ? body->shape : NULL; }
 void RigidBody_SetShape(RigidBody* body, const Shape* shape) {
     if (!body || !shape) return;
@@ -279,7 +252,6 @@ void RigidBody_SetShape(RigidBody* body, const Shape* shape) {
     RigidBody_ComputeMassData(body);
 }
 
-// User data
 void* RigidBody_GetUserData(RigidBody* body) { return body ? body->userData : NULL; }
 void RigidBody_SetUserData(RigidBody* body, void* data) { if (body) body->userData = data; }
 
@@ -339,7 +311,6 @@ float RigidBody_GetLinearVelocityAtPoint(RigidBody* body, Vector2 worldPoint) {
     return PR_Vec2_Length((Vector2){ body->linearVelocity.x + (-r.y * body->angularVelocity), body->linearVelocity.y + (r.x * body->angularVelocity) });
 }
 
-// Energy
 float RigidBody_GetKineticEnergy(RigidBody* body) {
     if (!body) return 0.0f;
     float v2 = PR_Vec2_LengthSqr(body->linearVelocity);
@@ -352,7 +323,6 @@ float RigidBody_GetPotentialEnergy(RigidBody* body, float gravityMag) {
     return body->mass * gravityMag * body->position.y;
 }
 
-// AABB
 void RigidBody_GetAABB(RigidBody* body, Vector2* min, Vector2* max) {
     if (!body || !body->shape) return;
     Shape_ComputeAABB(body->shape, body->position.x, body->position.y, body->angle, min, max);

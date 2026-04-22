@@ -34,7 +34,6 @@ void SpatialHash_Clear(void) {
 static uint32_t HashVec2(Vector2 v, int cellSize) {
     int x = (int)floorf(v.x / cellSize);
     int y = (int)floorf(v.y / cellSize);
-    // Simple integer hash
     uint32_t h = ((uint32_t)x * 73856093) ^ ((uint32_t)y * 19349663);
     return h % PHYRIB_HASH_SIZE;
 }
@@ -61,8 +60,6 @@ BodyNode* SpatialHash_Query(Vector2 point, int cellSize) {
 }
 
 BodyNode* SpatialHash_QueryAABB(Vector2 min, Vector2 max, int cellSize) {
-    // For now, return all buckets that might overlap. Caller must deduplicate.
-    // This is a simplified version - in practice you'd check multiple cells.
     uint32_t h = HashAABB(min, max, cellSize);
     return gHash.buckets[h].head;
 }

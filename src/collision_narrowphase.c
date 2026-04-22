@@ -2,10 +2,6 @@
 #include "phyrib/collision.h"
 #include <math.h>
 
-// ==========================================
-// Helper Functions
-// ==========================================
-
 static inline Vector2 TransformPoint(Vector2 p, float angle) {
     float c = cosf(angle);
     float s = sinf(angle);
@@ -18,19 +14,11 @@ static inline Vector2 InverseTransformPoint(Vector2 p, float angle) {
     return (Vector2){ p.x * c - p.y * s, p.x * s + p.y * c };
 }
 
-// ==========================================
-// Broad Phase: AABB Overlap Test
-// ==========================================
-
 bool Collision_AABBOverlap(Vector2 minA, Vector2 maxA, Vector2 minB, Vector2 maxB) {
     if (maxA.x < minB.x || minA.x > maxB.x) return false;
     if (maxA.y < minB.y || minA.y > maxB.y) return false;
     return true;
 }
-
-// ==========================================
-// Circle vs Circle
-// ==========================================
 
 static bool Collision_TestCircleCircle(const Shape* a, float ax, float ay, float aa,
                                         const Shape* b, float bx, float by, float ba,
@@ -69,14 +57,9 @@ static bool Collision_TestCircleCircle(const Shape* a, float ax, float ay, float
     return true;
 }
 
-// ==========================================
-// Circle vs Polygon (or Rectangle)
-// ==========================================
-
 static bool Collision_TestCirclePolygon(const Shape* circle, float cx, float cy, float cAngle,
                                          const Shape* poly, float px, float py, float pAngle,
                                          Manifold* m) {
-    // Build polygon vertices in local space (handle rectangle)
     Vector2 polyVerts[64];
     int polyCount = poly->vertexCount;
     if (poly->type == PR_SHAPE_RECTANGLE) {
@@ -93,13 +76,11 @@ static bool Collision_TestCirclePolygon(const Shape* circle, float cx, float cy,
         }
     }
 
-    // Transform circle center to polygon local space
     Vector2 circleWorld = { cx, cy };
     Vector2 circleLocal = InverseTransformPoint(circleWorld, pAngle);
     circleLocal.x -= px;
     circleLocal.y -= py;
 
-    // Find closest point on polygon to circle center
     float minDistSq = FLT_MAX;
     int closestEdge = -1;
     Vector2 closestLocal = {0, 0};
@@ -116,7 +97,6 @@ static bool Collision_TestCirclePolygon(const Shape* circle, float cx, float cy,
         PR_Vec2_Sub(&toCircle, circleLocal, v1);
 
         if (edgeLenSq < 0.0001f) {
-            // Degenerate edge
             Vector2 diff;
             PR_Vec2_Sub(&diff, circleLocal, v1);
             float dSq = PR_Vec2_LengthSqr(diff);
@@ -145,17 +125,14 @@ static bool Collision_TestCirclePolygon(const Shape* circle, float cx, float cy,
     if (minDistSq > radius * radius) return false;
     float dist = sqrtf(minDistSq);
 
-    // Contact point in world space
     Vector2 closestWorld = TransformPoint(closestLocal, pAngle);
     closestWorld.x += px;
     closestWorld.y += py;
 
-    // Normal (from circle A to polygon B)
     if (dist > 0.0001f) {
         m->normal.x = (closestWorld.x - circleWorld.x) / dist;
         m->normal.y = (closestWorld.y - circleWorld.y) / dist;
     } else {
-        // Circle center exactly on edge: use polygon edge outward normal
         Vector2 v1 = polyVerts[closestEdge];
         Vector2 v2 = polyVerts[(closestEdge + 1) % polyCount];
         Vector2 edge;
@@ -173,14 +150,9 @@ static bool Collision_TestCirclePolygon(const Shape* circle, float cx, float cy,
     return true;
 }
 
-// ==========================================
-// Polygon vs Polygon using SAT
-// ==========================================
-
 static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, float aAngle,
                                           const Shape* b, float bX, float bY, float bAngle,
                                           Manifold* m) {
-    // Build vertex and normal data for shape A (handling rectangles)
     Vector2 vertsA[64];
     float normalsA[64];
     int countA;
@@ -207,7 +179,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
         }
     }
 
-    // Build vertex and normal data for shape B
     Vector2 vertsB[64];
     float normalsB[64];
     int countB;
@@ -234,16 +205,13 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
         }
     }
 
-    // SAT main loop
     float minOverlap = FLT_MAX;
     Vector2 collisionNormal = {0, 0};
     bool bestFromA = false;
     int bestIndex = -1;
 
-    // Test all face normals of polygon A
     for (int i = 0; i < countA; i++) {
         Vector2 axis = { cosf(normalsA[i]), sinf(normalsA[i]) };
-        // Project A onto axis
         float minA = FLT_MAX, maxA = -FLT_MAX;
         for (int v = 0; v < countA; v++) {
             Vector2 wv = TransformPoint(vertsA[v], aAngle);
@@ -252,7 +220,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
             if (proj < minA) minA = proj;
             if (proj > maxA) maxA = proj;
         }
-        // Project B onto axis
         float minB = FLT_MAX, maxB = -FLT_MAX;
         for (int v = 0; v < countB; v++) {
             Vector2 wv = TransformPoint(vertsB[v], bAngle);
@@ -261,9 +228,7 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
             if (proj < minB) minB = proj;
             if (proj > maxB) maxB = proj;
         }
-        // Check for gap
         if (maxA < minB || maxB < minA) return false;
-        // Compute overlap
         float overlap = PR_MIN(maxA, maxB) - PR_MAX(minA, minB);
         if (overlap < minOverlap) {
             minOverlap = overlap;
@@ -273,10 +238,8 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
         }
     }
 
-    // Test all face normals of polygon B
     for (int i = 0; i < countB; i++) {
         Vector2 axis = { cosf(normalsB[i]), sinf(normalsB[i]) };
-        // Project A onto axis
         float minA = FLT_MAX, maxA = -FLT_MAX;
         for (int v = 0; v < countA; v++) {
             Vector2 wv = TransformPoint(vertsA[v], aAngle);
@@ -285,7 +248,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
             if (proj < minA) minA = proj;
             if (proj > maxA) maxA = proj;
         }
-        // Project B onto axis
         float minB = FLT_MAX, maxB = -FLT_MAX;
         for (int v = 0; v < countB; v++) {
             Vector2 wv = TransformPoint(vertsB[v], bAngle);
@@ -294,9 +256,7 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
             if (proj < minB) minB = proj;
             if (proj > maxB) maxB = proj;
         }
-        // Check for gap
         if (maxA < minB || maxB < minA) return false;
-        // Compute overlap
         float overlap = PR_MIN(maxA, maxB) - PR_MAX(minA, minB);
         if (overlap < minOverlap) {
             minOverlap = overlap;
@@ -306,14 +266,12 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
         }
     }
 
-    // Ensure collision normal points from A to B
     Vector2 dir = { bX - aX, bY - aY };
     if (PR_Vec2_Dot(collisionNormal, dir) < 0) {
         collisionNormal.x = -collisionNormal.x;
         collisionNormal.y = -collisionNormal.y;
     }
 
-    // Determine reference and incident polygons
     const Vector2* refVerts;
     const Vector2* incVerts;
     float refX, refY, refAngle;
@@ -337,7 +295,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
         refEdgeIdx = bestIndex;
     }
 
-    // Reference edge vertices in world space
     Vector2 v1 = TransformPoint(refVerts[refEdgeIdx], refAngle);
     v1.x += refX; v1.y += refY;
     Vector2 v2 = TransformPoint(refVerts[(refEdgeIdx + 1) % refCount], refAngle);
@@ -347,7 +304,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
     PR_Vec2_Sub(&edgeDir, v2, v1);
     PR_Vec2_Normalize(&edgeDir);
 
-    // Incident polygon vertices in world space
     Vector2 incWorld[64];
     for (int i = 0; i < incCount; i++) {
         incWorld[i] = TransformPoint(incVerts[i], incAngle);
@@ -355,7 +311,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
         incWorld[i].y += incY;
     }
 
-    // Clip incident polygon against reference face plane
     float refFaceOffset = PR_Vec2_Dot(v1, collisionNormal);
     Vector2 clipped1[64];
     int c1 = 0;
@@ -376,7 +331,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
     }
     if (c1 == 0) return false;
 
-    // Clip against side plane 1: dot(p, edgeDir) >= dot(v1, edgeDir)
     Vector2 clipped2[64];
     int c2 = 0;
     float v1proj = PR_Vec2_Dot(v1, edgeDir);
@@ -397,7 +351,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
     }
     if (c2 == 0) return false;
 
-    // Clip against side plane 2: dot(p, edgeDir) <= dot(v2, edgeDir)
     Vector2 contacts[2];
     int contactCount = 0;
     float v2proj = PR_Vec2_Dot(v2, edgeDir);
@@ -418,7 +371,6 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
     }
     if (contactCount == 0) return false;
 
-    // Fill manifold
     m->normal = collisionNormal;
     m->penetration = minOverlap;
     m->contactCount = contactCount;
@@ -429,53 +381,42 @@ static bool Collision_TestPolygonPolygon(const Shape* a, float aX, float aY, flo
     return true;
 }
 
-// ==========================================
-// Main Entry Point: Dispatcher
-// ==========================================
-
 bool Collision_TestShapes(const Shape* a, float aX, float aY, float aAngle,
                           const Shape* b, float bX, float bY, float bAngle,
                           Manifold* manifold) {
     if (!manifold) return false;
 
-    // Clear manifold
     manifold->bodyA = NULL;
     manifold->bodyB = NULL;
     manifold->contactCount = 0;
     manifold->penetration = 0.0f;
     manifold->normal = (Vector2){0, 0};
-    // material will be set later by Collision_GenerateContact
 
     if (!a || !b) return false;
 
     ShapeType typeA = a->type;
     ShapeType typeB = b->type;
 
-    // Circle vs Circle
     if (typeA == PR_SHAPE_CIRCLE && typeB == PR_SHAPE_CIRCLE) {
         return Collision_TestCircleCircle(a, aX, aY, aAngle, b, bX, bY, bAngle, manifold);
     }
 
-    // Circle vs Polygon/Rectangle
     if (typeA == PR_SHAPE_CIRCLE && (typeB == PR_SHAPE_POLYGON || typeB == PR_SHAPE_RECTANGLE)) {
         return Collision_TestCirclePolygon(a, aX, aY, aAngle, b, bX, bY, bAngle, manifold);
     }
     if (typeB == PR_SHAPE_CIRCLE && (typeA == PR_SHAPE_POLYGON || typeA == PR_SHAPE_RECTANGLE)) {
         bool result = Collision_TestCirclePolygon(b, bX, bY, bAngle, a, aX, aY, aAngle, manifold);
         if (result) {
-            // Flip normal to point from A to B
             manifold->normal.x = -manifold->normal.x;
             manifold->normal.y = -manifold->normal.y;
         }
         return result;
     }
 
-    // Polygon vs Polygon (including rectangles)
     if ((typeA == PR_SHAPE_POLYGON || typeA == PR_SHAPE_RECTANGLE) &&
         (typeB == PR_SHAPE_POLYGON || typeB == PR_SHAPE_RECTANGLE)) {
         return Collision_TestPolygonPolygon(a, aX, aY, aAngle, b, bX, bY, bAngle, manifold);
     }
 
-    // Unsupported shape combinations
     return false;
 }

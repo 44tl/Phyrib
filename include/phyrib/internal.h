@@ -15,7 +15,6 @@
 #define M_TAU 6.28318530717958647692f
 #endif
 
-// Inline math helpers
 static inline float PR_Clamp(float v, float lo, float hi) {
     if (v < lo) return lo;
     if (v > hi) return hi;
@@ -84,24 +83,20 @@ static inline void PR_Mat2_Init(float* m, float angle) {
     m[2] = s; m[3] = c;
 }
 
-// Hash table for spatial hashing
 #define PHYRIB_HASH_SIZE 1024
 #define PHYRIB_HASH(KEY) (((KEY) * 2654435761u) % PHYRIB_HASH_SIZE)
 
-// Linked list node for bodies
 typedef struct BodyNode {
     RigidBody* body;
     struct BodyNode* next;
 } BodyNode;
 
-// Array for dynamic body storage
 typedef struct {
     RigidBody** bodies;
     int count;
     int capacity;
 } BodyArray;
 
-// Drawn color configuration
 typedef struct {
     Color shape;
     Color aabb;
@@ -114,22 +109,18 @@ typedef struct {
     bool fillShapes;
 } DebugRenderState;
 
-// Global debug state
 extern DebugRenderState gDebugState;
 
-// Random ID generator
 static inline PhysicsBodyID GenerateBodyID() {
     static PhysicsBodyID nextID = 1;
     return nextID++;
 }
 
-// Body flags
-#define BODY_FLAG_ISLAND     0x01  // Part of an island
-#define BODY_FLAG_AWAKE      0x02  // Body is awake
-#define BODY_FLAG_SLEEPING   0x04  // Body is sleeping
-#define BODY_FLAG_LOCK_AXIS  0x08  // Lock rotation axis
+#define BODY_FLAG_ISLAND     0x01
+#define BODY_FLAG_AWAKE      0x02
+#define BODY_FLAG_SLEEPING   0x04
+#define BODY_FLAG_LOCK_AXIS  0x08
 
-// Helpers
 static inline bool Body_IsStatic(const RigidBody* body) {
     return body->type == PR_BODY_STATIC;
 }
@@ -174,7 +165,6 @@ static inline float Body_ComputeInertiaForCapsule(float mass, float radius, floa
     return cylInert + sphInert;
 }
 
-// Memory allocation helpers
 static inline void* PR_Alloc(size_t size) {
     return malloc(size);
 }

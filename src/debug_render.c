@@ -5,21 +5,19 @@
 #include "raylib.h"
 #endif
 
-// Global debug render state
 DebugRenderState gDebugState;
 
-// Initialize debug renderer with default colors
 void DebugRender_Init(PhysicsWorld* world) {
-    gDebugState.shape = (Color){255, 255, 255, 255};      // White for shapes
-    gDebugState.aabb = (Color){255, 0, 0, 255};           // Red for AABB
-    gDebugState.contact = (Color){0, 255, 0, 255};        // Green for contacts
-    gDebugState.static_ = (Color){0, 255, 0, 255};        // Green for static bodies
-    gDebugState.dynamic = (Color){0, 0, 255, 255};        // Blue for dynamic bodies
-    gDebugState.kinematic = (Color){255, 255, 0, 255};    // Yellow for kinematic bodies
-    gDebugState.sleeping = (Color){128, 128, 128, 255};   // Gray for sleeping bodies
+    gDebugState.shape = (Color){255, 255, 255, 255};
+    gDebugState.aabb = (Color){255, 0, 0, 255};
+    gDebugState.contact = (Color){0, 255, 0, 255};
+    gDebugState.static_ = (Color){0, 255, 0, 255};
+    gDebugState.dynamic = (Color){0, 0, 255, 255};
+    gDebugState.kinematic = (Color){255, 255, 0, 255};
+    gDebugState.sleeping = (Color){128, 128, 128, 255};
     gDebugState.lineThickness = 1.0f;
     gDebugState.fillShapes = false;
-    (void)world; // unused
+    (void)world;
 }
 
 void DebugRender_SetConfig(const DebugRenderConfig* config) {
@@ -49,10 +47,8 @@ void DebugRender_GetConfig(DebugRenderConfig* config) {
 }
 
 void DebugRender_Cleanup(void) {
-    // No dynamic resources to free currently
 }
 
-// Helper to choose body color based on type and sleep state
 static Color GetBodyColor(RigidBody* body) {
     if (!RigidBody_IsAwake(body)) {
         return gDebugState.sleeping;
@@ -65,7 +61,6 @@ static Color GetBodyColor(RigidBody* body) {
     }
 }
 
-// Helper to transform a local point to world coordinates
 static inline void TransformPoint(Vector2* out, Vector2 local, float x, float y, float angle) {
     PR_Vec2_Rotate(out, &local, angle);
     out->x += x;
@@ -78,7 +73,6 @@ static inline void TransformPoint(Vector2* out, Vector2 local, float x, float y,
 void DebugRender_DrawWorld(PhysicsWorld* world, int flags) {
     if (!world) return;
 
-    // Get all bodies via a very large AABB query
     Vector2 min = { -1000000.0f, -1000000.0f };
     Vector2 max = {  1000000.0f,  1000000.0f };
     int count = 0;
@@ -88,9 +82,6 @@ void DebugRender_DrawWorld(PhysicsWorld* world, int flags) {
     for (int i = 0; i < count; i++) {
         DebugRender_DrawBody(bodies[i], flags);
     }
-
-    // Note: Contact drawing is intentionally omitted as no public API to retrieve contacts
-    // Users can call DebugRender_DrawContact for each contact from their collision callback if desired
 }
 
 void DebugRender_DrawBody(RigidBody* body, int flags) {
@@ -127,8 +118,6 @@ void DebugRender_DrawBody(RigidBody* body, int flags) {
         }
         DebugRender_DrawText(buf, pos, bodyColor);
     }
-
-    // PR_DEBUG_COLLISION_NORMAL is handled separately via DrawContact calls
 }
 
 void DebugRender_DrawShape(const Shape* shape, float x, float y, float angle, Color color) {
@@ -150,7 +139,6 @@ void DebugRender_DrawShape(const Shape* shape, float x, float y, float angle, Co
             for (int i = 0; i < 4; i++) {
                 TransformPoint(&world[i], local[i], x, y, angle);
             }
-            // Draw four lines forming the rectangle
             DrawLineV(world[0], world[1], color);
             DrawLineV(world[1], world[2], color);
             DrawLineV(world[2], world[3], color);
@@ -161,12 +149,10 @@ void DebugRender_DrawShape(const Shape* shape, float x, float y, float angle, Co
             const Vector2* verts = shape->data.polygon.vertices;
             int count = shape->data.polygon.count;
             if (count < 3) break;
-            // Transform vertices to world space
             Vector2* world = (Vector2*)PR_Alloc(sizeof(Vector2) * count);
             for (int i = 0; i < count; i++) {
                 TransformPoint(&world[i], verts[i], x, y, angle);
             }
-            // Draw polygon outline
             for (int i = 0; i < count; i++) {
                 int j = (i + 1) % count;
                 DrawLineV(world[i], world[j], color);
@@ -179,18 +165,15 @@ void DebugRender_DrawShape(const Shape* shape, float x, float y, float angle, Co
             float h = shape->data.capsule.height;
             float halfH = h * 0.5f;
 
-            // End points along local Y axis
             Vector2 p1_local = {0.0f, -halfH};
             Vector2 p2_local = {0.0f,  halfH};
             Vector2 p1, p2;
             TransformPoint(&p1, p1_local, x, y, angle);
             TransformPoint(&p2, p2_local, x, y, angle);
 
-            // Draw end circles
             DrawCircleLines(p1.x, p1.y, r, color);
             DrawCircleLines(p2.x, p2.y, r, color);
 
-            // Draw connecting rectangle (body)
             Vector2 corners_local[4] = {
                 {-r, -halfH}, {r, -halfH}, {r, halfH}, {-r, halfH}
             };
@@ -219,17 +202,14 @@ void DebugRender_DrawShape(const Shape* shape, float x, float y, float angle, Co
 }
 
 void DebugRender_DrawAABB(Vector2 min, Vector2 max, Color color) {
-    // Draw rectangle outline using four lines
-    DrawLineV((Vector2){min.x, min.y}, (Vector2){max.x, min.y}, color); // bottom
-    DrawLineV((Vector2){max.x, min.y}, (Vector2){max.x, max.y}, color); // right
-    DrawLineV((Vector2){max.x, max.y}, (Vector2){min.x, max.y}, color); // top
-    DrawLineV((Vector2){min.x, max.y}, (Vector2){min.x, min.y}, color); // left
+    DrawLineV((Vector2){min.x, min.y}, (Vector2){max.x, min.y}, color);
+    DrawLineV((Vector2){max.x, min.y}, (Vector2){max.x, max.y}, color);
+    DrawLineV((Vector2){max.x, max.y}, (Vector2){min.x, max.y}, color);
+    DrawLineV((Vector2){min.x, max.y}, (Vector2){min.x, min.y}, color);
 }
 
 void DebugRender_DrawContact(Vector2 point, Vector2 normal, Color color) {
-    // Draw contact point as small circle
     DrawCircleLines(point.x, point.y, 3.0f, color);
-    // Draw normal vector (scaled for visibility)
     Vector2 end = { point.x + normal.x * 20.0f, point.y + normal.y * 20.0f };
     DrawLineV(point, end, color);
 }

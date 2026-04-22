@@ -2,10 +2,6 @@
 #include "phyrib/constraint.h"
 #include "phyrib/rigid_body.h"
 
-// ============================================================================
-// INTERNAL CONSTRAINT STRUCTURE
-// ============================================================================
-
 struct Constraint {
     ConstraintType type;
     RigidBody* bodyA;
@@ -13,32 +9,24 @@ struct Constraint {
     Vector2 localAnchorA;
     Vector2 localAnchorB;
 
-    // Computed per-frame data (PreSolve)
-    Vector2 worldAnchorA;   // World position of anchor on body A (or fixed point if bodyA==NULL)
-    Vector2 worldAnchorB;   // World position of anchor on body B
-    Vector2 rA;             // Vector from body A center to world anchor A (world space)
-    Vector2 rB;             // Vector from body B center to world anchor B (world space)
+    Vector2 worldAnchorA;
+    Vector2 worldAnchorB;
+    Vector2 rA;
+    Vector2 rB;
 
-    // Accumulated impulses (warm start)
-    Vector2 impulse;            // For 2D constraints (pin, spring)
-    float normalImpulse;        // For 1D constraints (distance)
-    float tangentImpulse;       // Reserved
+    Vector2 impulse;
+    float normalImpulse;
+    float tangentImpulse;
 
-    // Type-specific parameters
     union {
         struct { float restLength; } distance;
         struct { float stiffness; float damping; float restLength; } spring;
         struct { float targetSpeed; float maxForce; bool enabled; } motor;
     } params;
 
-    // Cached mass data
-    float effectiveMass;    // For 1D constraints
-    Vector2 massNormal;     // Constraint direction (distance)
+    float effectiveMass;
+    Vector2 massNormal;
 };
-
-// ============================================================================
-// CREATE / DESTROY
-// ============================================================================
 
 Constraint* Constraint_Create(const ConstraintDef* def) {
     if (!def) return NULL;
@@ -88,10 +76,6 @@ void Constraint_GetBodies(Constraint* c, RigidBody** a, RigidBody** b) {
     if (b) *b = c->bodyB;
 }
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
-
 ConstraintType Constraint_GetType(Constraint* c) {
     return c ? c->type : PR_CONSTRAINT_DISTANCE;
 }
@@ -116,7 +100,6 @@ void Constraint_SetSpringParams(Constraint* c, float stiffness, float damping, f
     c->params.spring.restLength = restLength;
 }
 
-// Motor stubs
 void Constraint_SetMotorParams(Constraint* c, float targetSpeed, float maxForce) {
     if (!c || c->type != PR_CONSTRAINT_MOTOR) return;
     c->params.motor.targetSpeed = targetSpeed;
@@ -132,10 +115,6 @@ bool Constraint_IsMotorEnabled(Constraint* c) {
 float Constraint_GetMotorSpeed(Constraint* c) {
     return c && c->type == PR_CONSTRAINT_MOTOR ? c->params.motor.targetSpeed : 0.0f;
 }
-
-// ============================================================================
-// PIN CONSTRAINT (Point-to-Point)
-// ============================================================================
 
 static void Pin_PreSolve(Constraint* c, float dt) {
     if (!c->bodyA && !c->bodyB) return;
@@ -173,7 +152,6 @@ static void Pin_Solve(Constraint* c, float dt) {
     float invInertiaA = aDynamic ? bodyA->invInertia : 0.0f;
     float invInertiaB = bDynamic ? bodyB->invInertia : 0.0f;
 
-    // Compute velocities at anchors
     Vector2 velA = {0,0}, velB = {0,0};
     if (hasA) {
         velA = (Vector2){
@@ -190,7 +168,6 @@ static void Pin_Solve(Constraint* c, float dt) {
 
     Vector2 vRel = { velB.x - velA.x, velB.y - velA.y };
 
-    // Position error
     Vector2 error = {
         c->worldAnchorB.x - c->worldAnchorA.x,
         c->worldAnchorB.y - c->worldAnchorA.y
@@ -202,17 +179,14 @@ static void Pin_Solve(Constraint* c, float dt) {
         error.y * baumgarte / dt
     };
 
-    // Effective mass per axis
     float effMassX = 1.0f / (invMassA + invMassB + (c->rA.y * c->rA.y) * invInertiaA + (c->rB.y * c->rB.y) * invInertiaB);
     float effMassY = 1.0f / (invMassA + invMassB + (c->rA.x * c->rA.x) * invInertiaA + (c->rB.x * c->rB.x) * invInertiaB);
 
-    // Warm start
     Vector2 impulse = {
         -(vRel.x + bias.x) * effMassX + c->impulse.x,
         -(vRel.y + bias.y) * effMassY + c->impulse.y
     };
 
-    // Clamp
     float maxImpulse = 1.0f;
     impulse.x = PR_CLAMP(impulse.x, -maxImpulse, maxImpulse);
     impulse.y = PR_CLAMP(impulse.y, -maxImpulse, maxImpulse);
@@ -220,7 +194,6 @@ static void Pin_Solve(Constraint* c, float dt) {
     Vector2 delta = { impulse.x - c->impulse.x, impulse.y - c->impulse.y };
     c->impulse = impulse;
 
-    // Apply: bodyA gets -delta, bodyB gets +delta
     if (aDynamic) {
         bodyA->linearVelocity.x -= invMassA * delta.x;
         bodyA->linearVelocity.y -= invMassA * delta.y;
@@ -245,7 +218,6 @@ static void Pin_PostSolve(Constraint* c) {
     bool bDynamic = hasB && Body_IsDynamic(bodyB);
     if (!aDynamic && !bDynamic) return;
 
-    // Position error
     Vector2 error = {
         c->worldAnchorB.x - c->worldAnchorA.x,
         c->worldAnchorB.y - c->worldAnchorA.y
@@ -264,7 +236,6 @@ static void Pin_PostSolve(Constraint* c) {
     PR_Vec2_Normalize(&n);
     Vector2 correction = { n.x * correctionMag, n.y * correctionMag };
 
-    // Move bodies towards each other: A += invMassA/totalInvMass * correction, B -= invMassB/totalInvMass * correction
     if (aDynamic) {
         bodyA->position.x += bodyA->invMass * correction.x;
         bodyA->position.y += bodyA->invMass * correction.y;
@@ -274,10 +245,6 @@ static void Pin_PostSolve(Constraint* c) {
         bodyB->position.y -= bodyB->invMass * correction.y;
     }
 }
-
-// ============================================================================
-// DISTANCE CONSTRAINT
-// ============================================================================
 
 static void Distance_PreSolve(Constraint* c, float dt) {
     if (!c->bodyA && !c->bodyB) return;
@@ -297,7 +264,6 @@ static void Distance_PreSolve(Constraint* c, float dt) {
         c->rB = (Vector2){0,0};
     }
 
-    // Normal from A to B
     Vector2 d = { c->worldAnchorB.x - c->worldAnchorA.x, c->worldAnchorB.y - c->worldAnchorA.y };
     float len = PR_Vec2_Length(d);
     if (len > 0.0001f) {
@@ -307,7 +273,6 @@ static void Distance_PreSolve(Constraint* c, float dt) {
         c->massNormal = (Vector2){1,0};
     }
 
-    // Compute effective mass along normal
     float rACrossN = c->rA.y * c->massNormal.x - c->rA.x * c->massNormal.y;
     float rBCrossN = c->rB.y * c->massNormal.x - c->rB.x * c->massNormal.y;
 
@@ -352,7 +317,6 @@ static void Distance_Solve(Constraint* c, float dt) {
     Vector2 vRel = { velB.x - velA.x, velB.y - velA.y };
     float vn = PR_Vec2_Dot(vRel, c->massNormal);
 
-    // Position error along normal
     Vector2 rVec = { c->worldAnchorB.x - c->worldAnchorA.x, c->worldAnchorB.y - c->worldAnchorA.y };
     float currentLength = PR_Vec2_Length(rVec);
     float C = currentLength - c->params.distance.restLength;
@@ -360,16 +324,13 @@ static void Distance_Solve(Constraint* c, float dt) {
     const float baumgarte = 0.2f;
     float bias = C * baumgarte / dt;
 
-    // Warm start
     float impulse = -(vn + bias) * c->effectiveMass + c->normalImpulse;
 
-    // Clamp
     float maxImpulse = 1.0f;
     float oldImpulse = c->normalImpulse;
     c->normalImpulse = PR_CLAMP(impulse, -maxImpulse, maxImpulse);
     impulse = c->normalImpulse - oldImpulse;
 
-    // Apply along normal
     Vector2 P = { c->massNormal.x * impulse, c->massNormal.y * impulse };
 
     if (aDynamic) {
@@ -394,7 +355,6 @@ static void Distance_PostSolve(Constraint* c) {
     bool bDynamic = bodyB && Body_IsDynamic(bodyB);
     if (!aDynamic && !bDynamic) return;
 
-    // Position error along normal
     Vector2 rVec = { c->worldAnchorB.x - c->worldAnchorA.x, c->worldAnchorB.y - c->worldAnchorA.y };
     float currentLength = PR_Vec2_Length(rVec);
     float C = currentLength - c->params.distance.restLength;
@@ -422,10 +382,6 @@ static void Distance_PostSolve(Constraint* c) {
         bodyB->position.y -= sign * n.y * correctionMag;
     }
 }
-
-// ============================================================================
-// SPRING CONSTRAINT
-// ============================================================================
 
 static void Spring_PreSolve(Constraint* c, float dt) {
     if (!c->bodyA && !c->bodyB) return;
@@ -469,7 +425,6 @@ static void Spring_Solve(Constraint* c, float dt) {
     float stretch = currentLength - c->params.spring.restLength;
     float springForce = -c->params.spring.stiffness * stretch;
 
-    // Velocity at anchors
     Vector2 velA = {0,0}, velB = {0,0};
     if (bodyA) {
         velA = (Vector2){
@@ -489,7 +444,6 @@ static void Spring_Solve(Constraint* c, float dt) {
 
     float totalForce = springForce + dampingForce;
 
-    // impulse = force * dt
     Vector2 impulse = { n.x * totalForce * dt, n.y * totalForce * dt };
 
     if (aDynamic) {
@@ -505,12 +459,7 @@ static void Spring_Solve(Constraint* c, float dt) {
 }
 
 static void Spring_PostSolve(Constraint* c) {
-    // No position correction needed for spring
 }
-
-// ============================================================================
-// PUBLIC SOLVER API
-// ============================================================================
 
 void Constraint_PreSolve(Constraint* c, float dt) {
     if (!c) return;
@@ -572,12 +521,7 @@ void Constraint_PostSolve(Constraint* c) {
     }
 }
 
-// ============================================================================
-// DEBUG RENDERING (stub)
-// ============================================================================
-
 void Constraint_DrawDebug(Constraint* c, Color color) {
     (void)c;
     (void)color;
-    // No-op: raylib not available or not implemented
 }

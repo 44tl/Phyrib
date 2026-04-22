@@ -4,14 +4,14 @@
 
 struct Shape {
     ShapeType type;
-    float radius;      // for circle/capsule
+    float radius;
     float width, height;
-    Vector2* vertices; // for polygon
+    Vector2* vertices;
     int vertexCount;
-    float* normals;    // precomputed normals
-    float inertia;     // precomputed inertia
-    float area;        // precomputed area
-    Vector2 centroid;  // precomputed centroid
+    float* normals;
+    float inertia;
+    float area;
+    Vector2 centroid;
 };
 
 Shape* Shape_CreateCircle(float radius) {
@@ -46,7 +46,6 @@ Shape* Shape_CreatePolygon(const Vector2* vertices, int count) {
     s->normals = (float*)PR_Alloc(sizeof(float) * count);
     memcpy(s->vertices, vertices, sizeof(Vector2) * count);
 
-    // Compute centroid
     float cx = 0, cy = 0;
     float area = 0;
     for (int i = 0; i < count; i++) {
@@ -64,7 +63,6 @@ Shape* Shape_CreatePolygon(const Vector2* vertices, int count) {
     s->centroid = (Vector2){cx, cy};
     s->area = PR_ABS(area);
 
-    // Compute normals (pointing outward) and inertia
     float inertia = 0;
     for (int i = 0; i < count; i++) {
         int j = (i + 1) % count;
@@ -72,9 +70,8 @@ Shape* Shape_CreatePolygon(const Vector2* vertices, int count) {
         Vector2 normal = { e.y, -e.x };
         float len = PR_Vec2_Length(normal);
         if (len > 0) { normal.x /= len; normal.y /= len; }
-        s->normals[i] = atan2f(normal.y, normal.x); // Store normal angle
+        s->normals[i] = atan2f(normal.y, normal.x);
 
-        // Accumulate inertia (simplified)
         float k = PR_ABS(vertices[i].x * vertices[j].y - vertices[j].x * vertices[i].y);
         inertia += k * (PR_SQR(vertices[i].x) + vertices[i].x*vertices[j].x + PR_SQR(vertices[j].x) +
                        PR_SQR(vertices[i].y) + vertices[i].y*vertices[j].y + PR_SQR(vertices[j].y));
@@ -89,7 +86,7 @@ Shape* Shape_CreateCapsule(float radius, float height) {
     Shape* s = (Shape*)PR_AllocZeroed(sizeof(Shape));
     s->type = PR_SHAPE_CAPSULE;
     s->radius = radius;
-    s->height = height; // Half-height of cylindrical section
+    s->height = height;
     s->area = 2.0f * M_PI * radius * (2.0f * radius + height);
     s->centroid = (Vector2){0, 0};
     s->inertia = Body_ComputeInertiaForCapsule(1.0f, radius, height * 2.0f);
@@ -103,13 +100,12 @@ Shape* Shape_CreateEdge(Vector2 start, Vector2 end) {
     s->vertices[0] = start;
     s->vertices[1] = end;
     s->vertexCount = 2;
-    s->area = 0; // Edge has no area
+    s->area = 0;
     s->centroid = (Vector2){(start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f};
     return s;
 }
 
 Shape* Shape_CreateBox(float width, float height, float angle) {
-    // Creates a rotated rectangle as a 4-vertex polygon
     float hw = width * 0.5f;
     float hh = height * 0.5f;
     Vector2 verts[4];
@@ -170,11 +166,9 @@ Vector2 Shape_GetSupportPoint(const Shape* shape, Vector2 direction) {
             break;
         }
         case PR_SHAPE_CAPSULE: {
-            // Support point for capsule: max(radius, half-length + radius)
             Vector2 d = direction;
             PR_Vec2_Normalize(&d);
             float halfH = shape->height;
-            // Find farthest point along direction
             if (fabsf(d.x) > fabsf(d.y)) {
                 result.x = (d.x >= 0 ? halfH : -halfH);
                 result.y = 0;
@@ -182,7 +176,6 @@ Vector2 Shape_GetSupportPoint(const Shape* shape, Vector2 direction) {
                 result.y = (d.y >= 0 ? halfH : -halfH);
                 result.x = 0;
             }
-            // Add radius in direction
             if (direction.x != 0 || direction.y != 0) {
                 Vector2 dirNorm = direction;
                 PR_Vec2_Normalize(&dirNorm);
@@ -200,7 +193,6 @@ Vector2 Shape_GetSupportPoint(const Shape* shape, Vector2 direction) {
 void Shape_ComputeAABB(const Shape* shape, float posX, float posY, float angle, Vector2* min, Vector2* max) {
     if (!shape || !min || !max) return;
 
-    // Initialize to extreme values
     min->x = FLT_MAX; min->y = FLT_MAX;
     max->x = -FLT_MAX; max->y = -FLT_MAX;
 
@@ -240,12 +232,10 @@ void Shape_ComputeAABB(const Shape* shape, float posX, float posY, float angle, 
         }
         case PR_SHAPE_CAPSULE: {
             float halfH = shape->height;
-            // Cylinder body
             updateBounds(halfH, shape->radius);
             updateBounds(halfH, -shape->radius);
             updateBounds(-halfH, shape->radius);
             updateBounds(-halfH, -shape->radius);
-            // Hemispherical caps
             updateBounds(-halfH + shape->radius, shape->radius);
             updateBounds(halfH - shape->radius, shape->radius);
             updateBounds(-halfH + shape->radius, -shape->radius);
@@ -261,7 +251,6 @@ void Shape_ComputeAABB(const Shape* shape, float posX, float posY, float angle, 
         }
     }
 
-    // Expand by small epsilon to avoid floating-point issues
     float eps = 0.001f;
     min->x -= eps; min->y -= eps;
     max->x += eps; max->y += eps;
@@ -292,7 +281,7 @@ float Shape_ComputeMass(const Shape* shape, float density, float* outInertia) {
     if (!shape) return 0;
     float mass = shape->area * density;
     if (outInertia) {
-        *outInertia = shape->inertia * density + mass * PR_SQR(0.1f); // Add small radius for numerical stability
+        *outInertia = shape->inertia * density + mass * PR_SQR(0.1f);
     }
     return mass;
 }
@@ -300,7 +289,6 @@ float Shape_ComputeMass(const Shape* shape, float density, float* outInertia) {
 bool Shape_PointInside(const Shape* shape, Vector2 point, float posX, float posY, float angle) {
     if (!shape) return false;
 
-    // Transform point to local space
     Vector2 local = point;
     local.x -= posX; local.y -= posY;
     if (fabsf(angle) > 0.0001f) {
@@ -319,7 +307,6 @@ bool Shape_PointInside(const Shape* shape, Vector2 point, float posX, float posY
             return PR_ABS(local.x) <= hw && PR_ABS(local.y) <= hh;
         }
         case PR_SHAPE_POLYGON: {
-            // Point-in-polygon using ray casting
             bool inside = false;
             for (int i = 0, j = shape->vertexCount - 1; i < shape->vertexCount; j = i++) {
                 const Vector2* vi = &shape->vertices[i];
@@ -340,17 +327,13 @@ bool Shape_Raycast(const Shape* shape, Vector2 origin, Vector2 direction, float 
     if (!shape) return false;
     if (maxDist <= 0) return false;
 
-    // Simple ray-circle test for circle
     if (shape->type == PR_SHAPE_CIRCLE) {
-        // TODO: Full implementation
         return false;
     }
 
-    // Simplified rectangle raycast
     if (shape->type == PR_SHAPE_RECTANGLE) {
-        // TODO: Full implementation
         return false;
     }
 
-    return false; // Not implemented yet
+    return false;
 }

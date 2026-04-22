@@ -1,4 +1,3 @@
-// Basic shape tests
 #include "phyrib/phyrib.h"
 #include <stdio.h>
 #include <assert.h>
